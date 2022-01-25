@@ -7,8 +7,6 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Point
 import android.media.MediaPlayer
-import android.media.MediaPlayer.OnCompletionListener
-import android.media.MediaPlayer.OnPreparedListener
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -16,7 +14,6 @@ import android.os.Handler
 import android.text.method.ScrollingMovementMethod
 import android.util.Log
 import android.view.*
-import android.view.View.OnTouchListener
 import android.widget.RelativeLayout
 import android.widget.SeekBar
 import android.widget.SeekBar.OnSeekBarChangeListener
@@ -27,10 +24,20 @@ import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.ViewCompat
 import com.android.volley.toolbox.ImageLoader
 import com.google.android.gms.cast.framework.CastButtonFactory
+import com.google.android.gms.cast.framework.CastSession
 import com.google.sample.cast.refplayer.databinding.PlayerActivityBinding
 import com.google.sample.cast.refplayer.settings.CastPreference
 import com.google.sample.cast.refplayer.utils.*
 import java.util.*
+import com.google.android.gms.cast.framework.SessionManagerListener
+import com.google.android.gms.cast.framework.CastContext
+import com.google.android.gms.cast.MediaLoadRequestData
+
+import com.google.android.gms.cast.MediaInfo
+import com.google.android.gms.cast.MediaMetadata
+import com.google.android.gms.cast.MediaSeekOptions
+
+import com.google.android.gms.common.images.WebImage
 
 class LocalPlayerActivity: AppCompatActivity() {
 
@@ -47,35 +54,47 @@ class LocalPlayerActivity: AppCompatActivity() {
     private var mLocation: PlaybackLocation? = null
     private var mediaRouteMenuItem: MenuItem? = null
 
+    private var mCastSession: CastSession? = null
+    private var mSessionManagerListener: SessionManagerListener<CastSession>? = null
+    private var mCastContext: CastContext? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
         loadViews()
         setupControlsCallbacks()
-        // see what we need to play and where
+        setupCastListener()
+        mCastContext = CastContext.getSharedInstance(this)
+        mCastSession = mCastContext!!.sessionManager.currentCastSession
+        CastButtonFactory.setUpMediaRouteButton(applicationContext, binding.playerCastMode)
+
+        // смотрим, что мы будем воспроизводить и где
         val bundle = intent.extras
         if (bundle != null) {
             mSelectedMedia = MediaItem.fromBundle(intent.getBundleExtra("media"))
             setupActionBar()
             val shouldStartPlayback = bundle.getBoolean("shouldStart")
             val startPosition = bundle.getInt("startPosition", 0)
-            binding.videoView1.setVideoURI(Uri.parse(mSelectedMedia?.url))
+            binding.videoView.setVideoURI(Uri.parse(mSelectedMedia?.url))
             Log.d(TAG, "Setting url of the VideoView to: " + mSelectedMedia?.url)
             if (shouldStartPlayback) {
-                // this will be the case only if we are coming from the
-                // CastControllerActivity by disconnecting from a device
+                // этот кейс сработает только в том случае, если мы идем из CastControllerActivity,
+                // отключившись от устройства
                 mPlaybackState = PlaybackState.PLAYING
                 updatePlaybackLocation(PlaybackLocation.LOCAL)
                 updatePlayButton(mPlaybackState)
                 if (startPosition > 0) {
-                    binding.videoView1.seekTo(startPosition)
+                    binding.videoView.seekTo(startPosition)
                 }
-                binding.videoView1.start()
+                binding.videoView.start()
                 startControllersTimer()
             } else {
-                // we should load the video but pause it
-                // and show the album art.
-                updatePlaybackLocation(PlaybackLocation.LOCAL)
+                // мы должны загрузить видео, поставить его на паузу и показать обложку альбома.
+                if (mCastSession != null && mCastSession!!.isConnected) {
+                    updatePlaybackLocation(PlaybackLocation.REMOTE)
+                } else {
+                    updatePlaybackLocation(PlaybackLocation.LOCAL)
+                }
                 mPlaybackState = PlaybackState.IDLE
                 updatePlayButton(mPlaybackState)
             }
@@ -106,12 +125,17 @@ class LocalPlayerActivity: AppCompatActivity() {
         startControllersTimer()
         when (mLocation) {
             PlaybackLocation.LOCAL -> {
-                binding.videoView1.seekTo(position)
-                binding.videoView1.start()
+                binding.videoView.seekTo(position)
+                binding.videoView.start()
             }
             PlaybackLocation.REMOTE -> {
                 mPlaybackState = PlaybackState.BUFFERING
                 updatePlayButton(mPlaybackState)
+                val mediaSeekOption =
+                    MediaSeekOptions.Builder()
+                        .setPosition(position.toLong())
+                        .build()
+                mCastSession?.remoteMediaClient?.seek(mediaSeekOption)
             }
             else -> {}
         }
@@ -123,7 +147,7 @@ class LocalPlayerActivity: AppCompatActivity() {
         when (mPlaybackState) {
             PlaybackState.PAUSED -> when (mLocation) {
                 PlaybackLocation.LOCAL -> {
-                    binding.videoView1.start()
+                    binding.videoView.start()
                     Log.d(TAG, "Playing locally...")
                     mPlaybackState = PlaybackState.PLAYING
                     startControllersTimer()
@@ -135,18 +159,22 @@ class LocalPlayerActivity: AppCompatActivity() {
             }
             PlaybackState.PLAYING -> {
                 mPlaybackState = PlaybackState.PAUSED
-                binding.videoView1.pause()
+                binding.videoView.pause()
             }
             PlaybackState.IDLE -> when (mLocation) {
                 PlaybackLocation.LOCAL -> {
-                    binding.videoView1.setVideoURI(Uri.parse(mSelectedMedia!!.url))
-                    binding.videoView1.seekTo(0)
-                    binding.videoView1.start()
+                    binding.videoView.setVideoURI(Uri.parse(mSelectedMedia!!.url))
+                    binding.videoView.seekTo(0)
+                    binding.videoView.start()
                     mPlaybackState = PlaybackState.PLAYING
                     restartTrickplayTimer()
                     updatePlaybackLocation(PlaybackLocation.LOCAL)
                 }
-                PlaybackLocation.REMOTE -> {}
+                PlaybackLocation.REMOTE -> {
+                    if (mCastSession != null && mCastSession!!.isConnected) {
+                        loadRemoteMedia(binding.seekBar.progress, true);
+                    }
+                }
                 else -> {}
             }
             else -> {}
@@ -162,10 +190,10 @@ class LocalPlayerActivity: AppCompatActivity() {
                 binding.coverArtView.setImageUrl(url, imageLoader)
             }
             binding.coverArtView.visibility = View.VISIBLE
-            binding.videoView1.visibility = View.INVISIBLE
+            binding.videoView.visibility = View.INVISIBLE
         } else {
             binding.coverArtView.visibility = View.GONE
-            binding.videoView1.visibility = View.VISIBLE
+            binding.videoView.visibility = View.VISIBLE
         }
     }
 
@@ -218,11 +246,15 @@ class LocalPlayerActivity: AppCompatActivity() {
             if (mControllersTimer != null) {
                 mControllersTimer!!.cancel()
             }
-            // since we are playing locally, we need to stop the playback of
-            // video (if user is not watching, pause it!)
-            binding.videoView1.pause()
+            // так как мы воспроизводим локально, нам нужно остановить воспроизведение
+            // видео (если пользователь не смотрит, поставить его на паузу!)
+            binding.videoView.pause()
             mPlaybackState = PlaybackState.PAUSED
             updatePlayButton(PlaybackState.PAUSED)
+        }
+        mSessionManagerListener?.let { listener ->
+            mCastContext?.sessionManager
+                ?.removeSessionManagerListener(listener, CastSession::class.java)
         }
     }
 
@@ -245,7 +277,14 @@ class LocalPlayerActivity: AppCompatActivity() {
 
     override fun onResume() {
         Log.d(TAG, "onResume() was called")
-        updatePlaybackLocation(PlaybackLocation.LOCAL)
+        mSessionManagerListener?.let { listener ->
+            mCastContext!!.sessionManager.addSessionManagerListener(listener, CastSession::class.java)
+        }
+        if (mCastSession != null && mCastSession!!.isConnected) {
+            updatePlaybackLocation(PlaybackLocation.REMOTE)
+        } else {
+            updatePlaybackLocation(PlaybackLocation.LOCAL)
+        }
         super.onResume()
     }
 
@@ -253,7 +292,7 @@ class LocalPlayerActivity: AppCompatActivity() {
         override fun run() {
             mHandler.post {
                 if (mLocation == PlaybackLocation.LOCAL) {
-                    val currentPos: Int = binding.videoView1.currentPosition
+                    val currentPos: Int = binding.videoView.currentPosition
                     updateSeekbar(currentPos, mDuration)
                 }
             }
@@ -271,7 +310,7 @@ class LocalPlayerActivity: AppCompatActivity() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupControlsCallbacks() {
-        binding.videoView1.setOnErrorListener { mp, what, extra ->
+        binding.videoView.setOnErrorListener { mp, what, extra ->
             Log.e(
                 TAG, "OnErrorListener.onError(): VideoView encountered an "
                         + "error, what: " + what + ", extra: " + extra
@@ -284,44 +323,44 @@ class LocalPlayerActivity: AppCompatActivity() {
                 else -> getString(R.string.video_error_unknown_error)
             }
             showErrorDialog(msg)
-            binding.videoView1.stopPlayback()
+            binding.videoView.stopPlayback()
             mPlaybackState = PlaybackState.IDLE
             updatePlayButton(mPlaybackState)
             true
         }
-        binding.videoView1.setOnPreparedListener { mp ->
+        binding.videoView.setOnPreparedListener { mp ->
             Log.d(TAG, "onPrepared is reached")
             mDuration = mp.duration
             binding.endText.text = mDuration.formatMillis()
-            binding.seekBar1.max = mDuration
+            binding.seekBar.max = mDuration
             restartTrickplayTimer()
         }
-        binding.videoView1.setOnCompletionListener {
+        binding.videoView.setOnCompletionListener {
             stopTrickplayTimer()
             Log.d(TAG, "setOnCompletionListener()")
             mPlaybackState = PlaybackState.IDLE
             updatePlayButton(mPlaybackState!!)
         }
-        binding.videoView1.setOnTouchListener { _, _ ->
+        binding.videoView.setOnTouchListener { _, _ ->
             if (!mControllersVisible) {
                 updateControllersVisibility(true)
             }
             startControllersTimer()
             false
         }
-        binding.seekBar1.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+        binding.seekBar.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
             override fun onStopTrackingTouch(seekBar: SeekBar) {
                 if (mPlaybackState == PlaybackState.PLAYING) {
                     play(seekBar.progress)
                 } else if (mPlaybackState != PlaybackState.IDLE) {
-                    binding.videoView1.seekTo(seekBar.progress)
+                    binding.videoView.seekTo(seekBar.progress)
                 }
                 startControllersTimer()
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar) {
                 stopTrickplayTimer()
-                binding.videoView1.pause()
+                binding.videoView.pause()
                 stopControllersTimer()
             }
 
@@ -340,8 +379,8 @@ class LocalPlayerActivity: AppCompatActivity() {
     }
 
     private fun updateSeekbar(position: Int, duration: Int) {
-        binding.seekBar1.progress = position
-        binding.seekBar1.max = duration
+        binding.seekBar.progress = position
+        binding.seekBar.max = duration
         binding.startText.text = position.formatMillis()
         binding.endText.text = duration.formatMillis()
     }
@@ -351,7 +390,8 @@ class LocalPlayerActivity: AppCompatActivity() {
             TAG,
             "Controls: PlayBackState: $state"
         )
-        val isConnected = false
+        val isConnected = (mCastSession != null
+                && (mCastSession!!.isConnected || mCastSession!!.isConnecting))
         binding.controllers.setVisibility(!isConnected)
         binding.playCircle.setVisibility(!isConnected)
         when (state) {
@@ -367,7 +407,7 @@ class LocalPlayerActivity: AppCompatActivity() {
                 binding.playCircle.visibility = View.VISIBLE
                 binding.controllers.visibility = View.GONE
                 binding.coverArtView.visibility = View.VISIBLE
-                binding.videoView1.visibility = View.INVISIBLE
+                binding.videoView.visibility = View.INVISIBLE
             }
             PlaybackState.PAUSED -> {
                 binding.progressBar1.visibility = View.INVISIBLE
@@ -428,8 +468,8 @@ class LocalPlayerActivity: AppCompatActivity() {
                 displaySize.y + supportActionBar!!.height
             )
             lp.addRule(RelativeLayout.CENTER_IN_PARENT)
-            binding.videoView1.layoutParams = lp
-            binding.videoView1.invalidate()
+            binding.videoView.layoutParams = lp
+            binding.videoView.invalidate()
         } else {
             binding.textView2.text = mSelectedMedia!!.subTitle
             binding.textView1.text = mSelectedMedia!!.title
@@ -443,18 +483,18 @@ class LocalPlayerActivity: AppCompatActivity() {
                 (displaySize.x * mAspectRatio).toInt()
             )
             lp.addRule(RelativeLayout.BELOW, R.id.toolbar)
-            binding.videoView1.layoutParams = lp
-            binding.videoView1.invalidate()
+            binding.videoView.layoutParams = lp
+            binding.videoView.invalidate()
         }
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         super.onCreateOptionsMenu(menu)
         menuInflater.inflate(R.menu.browse, menu)
-        mediaRouteMenuItem =
-            menu?.let {
-                CastButtonFactory.setUpMediaRouteButton(applicationContext, it, R.id.media_route_menu_item)
-            }
+//        mediaRouteMenuItem =
+//            menu?.let {
+//                CastButtonFactory.setUpMediaRouteButton(applicationContext, it, R.id.media_route_menu_item)
+//            }
         return true
     }
 
@@ -481,6 +521,89 @@ class LocalPlayerActivity: AppCompatActivity() {
         binding.startText.text = 0.formatMillis()
         ViewCompat.setTransitionName(binding.coverArtView, getString(R.string.transition_image))
         binding.playCircle.setOnClickListener { togglePlayback() }
+    }
+
+    private fun setupCastListener() {
+        mSessionManagerListener = object: SessionManagerListener<CastSession> {
+            override fun onSessionEnded(session: CastSession, error: Int) {
+                onApplicationDisconnected()
+            }
+
+            override fun onSessionResumeFailed(session: CastSession, error: Int) {
+                onApplicationDisconnected()
+            }
+
+            override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
+                onApplicationConnected(session)
+            }
+
+            override fun onSessionStartFailed(session: CastSession, error: Int) {
+                onApplicationDisconnected()
+            }
+
+            override fun onSessionStarted(session: CastSession, sessionId: String) {
+                onApplicationConnected(session)
+            }
+
+            override fun onSessionResuming(session: CastSession, sessionId: String) { }
+
+            override fun onSessionEnding(session: CastSession) { }
+
+            override fun onSessionStarting(session: CastSession) { }
+
+            override fun onSessionSuspended(session: CastSession, reason: Int) { }
+
+            private fun onApplicationConnected(castSession: CastSession) {
+                mCastSession = castSession
+                if (null != mSelectedMedia) {
+                    if (mPlaybackState === PlaybackState.PLAYING) {
+                        binding.videoView.pause()
+                        loadRemoteMedia(binding.seekBar.progress, true)
+                        return
+                    } else {
+                        mPlaybackState = PlaybackState.IDLE
+                        updatePlaybackLocation(PlaybackLocation.REMOTE)
+                    }
+                }
+                updatePlayButton(mPlaybackState)
+                supportInvalidateOptionsMenu()
+            }
+
+            private fun onApplicationDisconnected() {
+                updatePlaybackLocation(PlaybackLocation.LOCAL)
+                mPlaybackState = PlaybackState.IDLE
+                mLocation = PlaybackLocation.LOCAL
+                updatePlayButton(mPlaybackState)
+                supportInvalidateOptionsMenu()
+            }
+        }
+    }
+
+    private fun loadRemoteMedia(position: Int, autoPlay: Boolean) {
+        if (mCastSession == null) {
+            return
+        }
+        val remoteMediaClient = mCastSession!!.remoteMediaClient ?: return
+        remoteMediaClient.load(
+            MediaLoadRequestData.Builder()
+                .setMediaInfo(buildMediaInfo())
+                .setAutoplay(autoPlay)
+                .setCurrentTime(position.toLong()).build()
+        )
+    }
+
+    private fun buildMediaInfo(): MediaInfo {
+        val movieMetadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE)
+        movieMetadata.putString(MediaMetadata.KEY_SUBTITLE, mSelectedMedia!!.studio)
+        movieMetadata.putString(MediaMetadata.KEY_TITLE, mSelectedMedia!!.title)
+        movieMetadata.addImage(WebImage(Uri.parse(mSelectedMedia!!.getImage(0))))
+        movieMetadata.addImage(WebImage(Uri.parse(mSelectedMedia!!.getImage(1))))
+        return MediaInfo.Builder(mSelectedMedia!!.url)
+            .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+            .setContentType("videos/mp4")
+            .setMetadata(movieMetadata)
+            .setStreamDuration((mSelectedMedia!!.duration * 1000).toLong())
+            .build()
     }
 
     companion object {
