@@ -31,8 +31,8 @@ class VideoListAdapter(private val clickListener: ItemClickListener, private val
         val textContainer: LinearLayout = binding.textContainer
 
         fun setImage(imgUrl: String, context: Context) {
-            val mImageLoader = CustomVolleyRequest.getInstance(context).imageLoader
-            mImageLoader.get(imgUrl, ImageLoader.getImageListener(imgView, 0, 0))
+            val mImageLoader = CustomVolleyRequest.getInstance(context)?.imageLoader
+            mImageLoader?.get(imgUrl, ImageLoader.getImageListener(imgView, 0, 0))
             imgView.setImageUrl(imgUrl, mImageLoader)
         }
     }

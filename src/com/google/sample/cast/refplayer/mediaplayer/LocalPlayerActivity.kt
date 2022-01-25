@@ -154,10 +154,11 @@ class LocalPlayerActivity: AppCompatActivity() {
 
     private fun setCoverArtStatus(url: String?) {
         if (url != null) {
-            val mImageLoader = CustomVolleyRequest.getInstance(this.applicationContext)
-                .imageLoader
-            mImageLoader[url, ImageLoader.getImageListener(binding.coverArtView, 0, 0)]
-            binding.coverArtView.setImageUrl(url, mImageLoader)
+            CustomVolleyRequest.getInstance(this.applicationContext)
+                ?.imageLoader?.let { imageLoader ->
+                imageLoader[url, ImageLoader.getImageListener(binding.coverArtView, 0, 0)]
+                binding.coverArtView.setImageUrl(url, imageLoader)
+            }
             binding.coverArtView.visibility = View.VISIBLE
             binding.videoView1.visibility = View.INVISIBLE
         } else {
