@@ -39,7 +39,7 @@ class VideoBrowserActivity: AppCompatActivity() {
         val intent = when (item.itemId) {
             R.id.action_settings ->
                 Intent(this@VideoBrowserActivity, CastPreference::class.java)
-            else -> Intent()
+            else -> null
         }
         startActivity(intent)
         return true
