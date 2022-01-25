@@ -26,6 +26,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.ViewCompat
 import com.android.volley.toolbox.ImageLoader
+import com.google.android.gms.cast.framework.CastButtonFactory
 import com.google.sample.cast.refplayer.databinding.PlayerActivityBinding
 import com.google.sample.cast.refplayer.settings.CastPreference
 import com.google.sample.cast.refplayer.utils.*
@@ -44,6 +45,7 @@ class LocalPlayerActivity: AppCompatActivity() {
     private var mControllersVisible = false
     private var mDuration = 0
     private var mLocation: PlaybackLocation? = null
+    private var mediaRouteMenuItem: MenuItem? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -449,6 +451,10 @@ class LocalPlayerActivity: AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         super.onCreateOptionsMenu(menu)
         menuInflater.inflate(R.menu.browse, menu)
+        mediaRouteMenuItem =
+            menu?.let {
+                CastButtonFactory.setUpMediaRouteButton(applicationContext, it, R.id.media_route_menu_item)
+            }
         return true
     }
 

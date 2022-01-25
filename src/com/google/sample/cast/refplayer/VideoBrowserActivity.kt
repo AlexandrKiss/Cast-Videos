@@ -9,6 +9,7 @@ import android.view.MenuItem
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import com.google.android.gms.cast.framework.CastButtonFactory
 import com.google.sample.cast.refplayer.databinding.VideoBrowserBinding
 import com.google.sample.cast.refplayer.settings.CastPreference
 
@@ -16,6 +17,7 @@ class VideoBrowserActivity: AppCompatActivity() {
 
     private val mIsHoneyCombOrAbove = Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB
     private val binding by lazy { VideoBrowserBinding.inflate(layoutInflater) }
+    private var mediaRouteMenuItem: MenuItem? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,6 +34,8 @@ class VideoBrowserActivity: AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         super.onCreateOptionsMenu(menu)
         menuInflater.inflate(R.menu.browse, menu)
+        mediaRouteMenuItem =
+            CastButtonFactory.setUpMediaRouteButton(applicationContext, menu!!, R.id.media_route_menu_item)
         return true
     }
 
