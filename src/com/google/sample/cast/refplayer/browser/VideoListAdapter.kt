@@ -49,7 +49,9 @@ class VideoListAdapter(private val clickListener: ItemClickListener, private val
             holder.apply {
                 titleView.text = video.title
                 descriptionView.text = video.studio
-                setImage(item.getImage(0), context)
+                video.getImage(0)?.let { img ->
+                    setImage(img, context)
+                }
                 imgView.setOnClickListener { clickListener.itemClicked(it, item, position) }
                 textContainer.setOnClickListener { clickListener.itemClicked(it, item, position) }
             }

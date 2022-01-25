@@ -289,7 +289,7 @@ class LocalPlayerActivity: AppCompatActivity() {
         binding.videoView1.setOnPreparedListener { mp ->
             Log.d(TAG, "onPrepared is reached")
             mDuration = mp.duration
-            binding.endText.text = Utils.formatMillis(mDuration)
+            binding.endText.text = mDuration.formatMillis()
             binding.seekBar1.max = mDuration
             restartTrickplayTimer()
         }
@@ -326,7 +326,7 @@ class LocalPlayerActivity: AppCompatActivity() {
                 seekBar: SeekBar, progress: Int,
                 fromUser: Boolean
             ) {
-                binding.startText.text = Utils.formatMillis(progress)
+                binding.startText.text = progress.formatMillis()
             }
         })
         binding.playPause.setOnClickListener {
@@ -339,8 +339,8 @@ class LocalPlayerActivity: AppCompatActivity() {
     private fun updateSeekbar(position: Int, duration: Int) {
         binding.seekBar1.progress = position
         binding.seekBar1.max = duration
-        binding.startText.text = Utils.formatMillis(position)
-        binding.endText.text = Utils.formatMillis(duration)
+        binding.startText.text = position.formatMillis()
+        binding.endText.text = duration.formatMillis()
     }
 
     private fun updatePlayButton(state: PlaybackState?) {

@@ -118,15 +118,10 @@ open class VideoProvider {
 
         private fun buildMediaInfo(title: String, studio: String, subTitle: String, duration: Int,
                    url: String, mimeType: String?, imgUrl: String, bigImageUrl: String): MediaItem {
-            val media = MediaItem()
-            media.url = url
-            media.title = title
-            media.subTitle = subTitle
-            media.studio = studio
+            val media =
+                MediaItem(title, subTitle, studio, url, mimeType ?: "", duration)
             media.addImage(imgUrl)
             media.addImage(bigImageUrl)
-            media.contentType = mimeType
-            media.duration = duration
             return media
         }
     }
