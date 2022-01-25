@@ -7,7 +7,7 @@ import android.preference.EditTextPreference
 import android.preference.PreferenceActivity
 import android.preference.PreferenceManager
 import com.google.sample.cast.refplayer.R
-import com.google.sample.cast.refplayer.utils.Utils
+import com.google.sample.cast.refplayer.utils.getAppVersionName
 
 class CastPreference: PreferenceActivity(), OnSharedPreferenceChangeListener {
 
@@ -19,7 +19,7 @@ class CastPreference: PreferenceActivity(), OnSharedPreferenceChangeListener {
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
 
         val versionPref = findPreference("app_version") as EditTextPreference
-        versionPref.title = getString(R.string.version, Utils.getAppVersionName(this))
+        versionPref.title = getString(R.string.version, getAppVersionName())
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {

@@ -198,7 +198,7 @@ class LocalPlayerActivity: AppCompatActivity() {
             supportActionBar!!.show()
             binding.controllers.visibility = View.VISIBLE
         } else {
-            if (!Utils.isOrientationPortrait(this)) {
+            if (!isOrientationPortrait()) {
                 supportActionBar!!.hide()
             }
             binding.controllers.visibility = View.INVISIBLE
@@ -281,7 +281,7 @@ class LocalPlayerActivity: AppCompatActivity() {
                     getString(R.string.video_error_server_unaccessible)
                 else -> getString(R.string.video_error_unknown_error)
             }
-            Utils.showErrorDialog(this@LocalPlayerActivity, msg)
+            showErrorDialog(msg)
             binding.videoView1.stopPlayback()
             mPlaybackState = PlaybackState.IDLE
             updatePlayButton(mPlaybackState)
@@ -420,7 +420,7 @@ class LocalPlayerActivity: AppCompatActivity() {
             binding.textView2.visibility = View.GONE
             binding.textView1.visibility = View.GONE
             binding.textView3.visibility = View.GONE
-            displaySize = Utils.getDisplaySize(this)
+            displaySize = getDisplaySize()
             val lp = RelativeLayout.LayoutParams(
                 displaySize.x,
                 displaySize.y + supportActionBar!!.height
@@ -435,7 +435,7 @@ class LocalPlayerActivity: AppCompatActivity() {
             binding.textView2.visibility = View.VISIBLE
             binding.textView1.visibility = View.VISIBLE
             binding.textView3.visibility = View.VISIBLE
-            displaySize = Utils.getDisplaySize(this)
+            displaySize = getDisplaySize()
             val lp = RelativeLayout.LayoutParams(
                 displaySize.x,
                 (displaySize.x * mAspectRatio).toInt()
