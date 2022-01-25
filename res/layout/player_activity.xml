@@ -46,11 +46,11 @@
 
         <ImageButton
             android:id="@+id/play_circle"
-            android:src="@drawable/ic_play_circle_white_80dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_centerInParent="true"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:src="@drawable/ic_play_circle_white_80dp" />
 
     </RelativeLayout>
 
@@ -82,7 +82,7 @@
             android:layout_alignParentBottom="true" >
 
             <ImageView
-                android:id="@+id/imageView2"
+                android:id="@+id/play_pause"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentLeft="true"
@@ -93,7 +93,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="fill_parent"
                 android:layout_marginLeft="5dp"
-                android:layout_toRightOf="@+id/imageView2"
+                android:layout_toRightOf="@+id/play_pause"
                 android:gravity="center_vertical"
                 android:maxLines="1"
                 android:text="0:00"

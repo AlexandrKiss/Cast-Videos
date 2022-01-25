@@ -28,6 +28,8 @@ import android.view.Display;
 import android.view.WindowManager;
 import android.widget.Toast;
 
+import java.security.cert.Extension;
+
 /**
  * A collection of utility methods, all static.
  */
